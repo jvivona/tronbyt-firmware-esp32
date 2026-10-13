@@ -25,6 +25,12 @@
 static TaskHandle_t s_dns_task_handle = NULL;
 static httpd_handle_t s_server = NULL;
 static TimerHandle_t s_ap_shutdown_timer = NULL;
+// True from arming the shutdown timer until its callback has finished
+static volatile bool s_ap_shutdown_pending = false;
+
+#ifndef CONFIG_AP_SHUTDOWN_SECONDS
+#define CONFIG_AP_SHUTDOWN_SECONDS 120
+#endif
 
 // HTML Parts for chunked response
 static const char *s_html_part1 =
@@ -397,7 +403,10 @@ static void ap_shutdown_timer_callback(TimerHandle_t xTimer) {
   ESP_LOGI(TAG, "Shutting down config portal");
   ap_stop();
   esp_wifi_set_mode(WIFI_MODE_STA);
+  s_ap_shutdown_pending = false;
 }
+
+bool ap_shutdown_pending(void) { return s_ap_shutdown_pending; }
 
 static esp_err_t root_handler(httpd_req_t *req) {
   const char *image_url = nvs_get_image_url();
@@ -881,17 +890,20 @@ void ap_start_shutdown_timer(void) {
 
   s_ap_shutdown_timer =
       xTimerCreate("ap_shutdown_timer",
-                   pdMS_TO_TICKS(2 * 60 * 1000),  // 2 minutes in milliseconds
+                   pdMS_TO_TICKS(CONFIG_AP_SHUTDOWN_SECONDS * 1000),
                    pdFALSE,                       // One-shot timer
                    NULL,                          // No timer ID
                    ap_shutdown_timer_callback     // Callback function
       );
 
   if (s_ap_shutdown_timer != NULL) {
+    s_ap_shutdown_pending = true;
     if (xTimerStart(s_ap_shutdown_timer, 0) == pdPASS) {
-      ESP_LOGI(TAG, "AP will automatically shut down in 2 minutes");
+      ESP_LOGI(TAG, "AP will automatically shut down in %d seconds",
+               CONFIG_AP_SHUTDOWN_SECONDS);
     } else {
       ESP_LOGE(TAG, "Failed to start AP shutdown timer");
+      s_ap_shutdown_pending = false;
       xTimerDelete(s_ap_shutdown_timer, 0);
       s_ap_shutdown_timer = NULL;
     }

@@ -43,6 +43,11 @@ void ap_configure(void);
 
 void ap_start_shutdown_timer(void);
 
+/**
+ * @brief Whether the AP auto-shutdown timer is armed and has not finished
+ */
+bool ap_shutdown_pending(void);
+
 #ifdef __cplusplus
 }
 

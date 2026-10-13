@@ -737,6 +737,22 @@ void app_main(void) {
     ESP_LOGI(TAG, "Using websockets with URL: %s", image_url);
     use_websocket = true;
 
+#ifdef CONFIG_AP_CLOSE_BEFORE_WEBSOCKET
+    // The client mallocs its buffers and creates its task from internal RAM,
+    // which the portal is still holding; start it once the portal is down.
+    if (ap_shutdown_pending()) {
+      ESP_LOGI(TAG, "Waiting for config portal to close before WebSocket...");
+      int waited_ms = 0;
+      while (ap_shutdown_pending() &&
+             waited_ms < (CONFIG_AP_SHUTDOWN_SECONDS + 10) * 1000) {
+        vTaskDelay(pdMS_TO_TICKS(250));
+        waited_ms += 250;
+      }
+      ESP_LOGI(TAG, "Free internal RAM after portal close: %" PRIu32,
+               heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+    }
+#endif
+
     char ws_headers[64 + MAX_API_KEY_LEN] = {0};
     if (strlen(api_key) > 0) {
       snprintf(ws_headers, sizeof(ws_headers), "Authorization: Bearer %s\r\n",

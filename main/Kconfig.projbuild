@@ -71,6 +71,26 @@ menu "Application Configuration"
         help
             Enable WiFi Access Point mode for configuration when connection fails.
 
+    config AP_SHUTDOWN_SECONDS
+        int "Config portal lifetime after WiFi connects (seconds)"
+        default 120
+        range 5 3600
+        depends on ENABLE_AP_MODE
+        help
+            How long the config portal stays up once the station has connected.
+            When WiFi does not connect the portal stays up regardless.
+
+    config AP_CLOSE_BEFORE_WEBSOCKET
+        bool "Wait for the config portal to close before starting WebSocket"
+        default n
+        depends on ENABLE_AP_MODE
+        help
+            The portal's HTTP server, DNS task and SoftAP buffers hold internal
+            RAM. On boards with little internal RAM left after the display DMA
+            buffers (e.g. Tronbyt S3 Wide) the WebSocket client task cannot be
+            created while the portal is up, so delay starting it until the
+            portal has shut down. Pair with a short AP_SHUTDOWN_SECONDS.
+
     config ENABLE_WIFI_POWER_SAVE
         bool "Enable WiFi Power Save"
         default n
